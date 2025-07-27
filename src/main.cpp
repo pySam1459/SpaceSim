@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <read_file_to_string.hpp>
 
 #include <array>
 #include <iostream>
@@ -96,26 +97,12 @@ try {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSwapInterval(1); // v-sync
 
+    std::string vertexShader = read_file_to_string("shaders/basic/triangle.vert"); 
+    std::string fragmentShader = read_file_to_string("shaders/basic/triangle.frag"); 
 
-    constexpr std::string_view kVS = R"(
-        #version 460 core
-        layout(location = 0) in vec2 aPos;
-        layout(location = 1) in vec3 aColor;
-        out vec3 vColor;
-        void main() {
-            vColor = aColor;
-            gl_Position = vec4(aPos, 0.0, 1.0);
-        })";
-
-    constexpr std::string_view kFS = R"(
-        #version 460 core
-        in  vec3 vColor;
-        out vec4 FragColor;
-        void main() { FragColor = vec4(vColor, 1.0); })";
-    
     GLuint prog = make_program(
-        compile_shader(GL_VERTEX_SHADER, kVS),
-        compile_shader(GL_FRAGMENT_SHADER, kFS)
+        compile_shader(GL_VERTEX_SHADER, vertexShader),
+        compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
     );
 
 
@@ -127,9 +114,9 @@ try {
     glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
 
     // attribute 0 - vec2 position
-    glEnableVertexArrayAttrib(vao, 0);
-    glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
-    glVertexArrayAttribBinding(vao, 0, 0);
+    glEnableVertexArrayAttrib(vao, 0); // Activates attribute slot attribIndex for this VAO
+    glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x)); // Tells OpenGL how to interpret the memory at each vertex for this attribute
+    glVertexArrayAttribBinding(vao, 0, 0); // Assigns the attribute to a specific binding point - “slots” where buffers (VBOs) are connected
 
     // attribute 1 - vec3 colour
     glEnableVertexArrayAttrib(vao, 1);
