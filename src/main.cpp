@@ -1,5 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#include <shaders.hpp>
 #include <read_file_to_string.hpp>
 
 #include <array>
@@ -11,54 +13,15 @@
 constexpr int kWidth = 1280;
 constexpr int kHeight = 720;
 
-GLuint compile_shader(GLenum type, std::string_view src)
-{
-    GLuint id = glCreateShader(type);
-    const char* csrc = src.data();
-    glShaderSource(id, 1, &csrc, nullptr);
-    glCompileShader(id);
-
-    GLint ok;
-    glGetShaderiv(id, GL_COMPILE_STATUS, &ok);
-    if (!ok) {
-        char log[1024];
-        glGetShaderInfoLog(id, sizeof log, nullptr, log);
-        throw std::runtime_error(std::string("shader compile error: ") + log);
-    }
-    return id;
-}
-
-GLuint make_program(GLuint vs, GLuint fs)
-{
-    GLuint prog = glCreateProgram();
-    glAttachShader(prog, vs);
-    glAttachShader(prog, fs);
-    glLinkProgram(prog);
-
-    GLint ok;
-    glGetProgramiv(prog, GL_LINK_STATUS, &ok);
-    if (!ok) {
-        char log[1024];
-        glGetProgramInfoLog(prog, sizeof log, nullptr, log);
-        throw std::runtime_error(std::string("link error: ") + log);
-    }
-
-    glDetachShader(prog, vs);
-    glDetachShader(prog, fs);
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    return prog;
-}
-
 struct Vertex {
-    float x, y;
+    float x, y, z;
     float r, g, b;
 };
 
 constexpr std::array<Vertex, 3> kTriangle = {{
-    {  0.0f,  0.6f, 1.0f, 0.0f, 0.0f },
-    { -0.7f, -0.6f, 0.0f, 1.0f, 0.0f },
-    {  0.7f, -0.6f, 0.0f, 0.0f, 1.0f }
+    {  0.0f,  0.6f, -1.0f, 1.0f, 0.0f, 0.0f },
+    { -0.7f, -0.6f, -1.0f, 0.0f, 1.0f, 0.0f },
+    {  0.7f, -0.6f, -1.0f, 0.0f, 0.0f, 1.0f }
 }};
 
 void framebuffer_size_callback(GLFWwindow*, int w, int h)
@@ -89,8 +52,6 @@ try {
         throw std::runtime_error("gladLoadGL failed");
     }
 
-    // std::cout << "Renderer: " << glGetString(GL_RENDERER) << "\n" << "OpenGL version " << glGetString(GL_VERSION) << std::endl;
-
     int fbWidth, fbHeight;
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
@@ -105,7 +66,6 @@ try {
         compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
     );
 
-
     GLuint vbo, vao;
     glCreateBuffers(1, &vbo);
     glNamedBufferStorage(vbo, sizeof(kTriangle), kTriangle.data(), 0);
@@ -115,7 +75,7 @@ try {
 
     // attribute 0 - vec2 position
     glEnableVertexArrayAttrib(vao, 0); // Activates attribute slot attribIndex for this VAO
-    glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x)); // Tells OpenGL how to interpret the memory at each vertex for this attribute
+    glVertexArrayAttribFormat(vao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, x)); // Tells OpenGL how to interpret the memory at each vertex for this attribute
     glVertexArrayAttribBinding(vao, 0, 0); // Assigns the attribute to a specific binding point - “slots” where buffers (VBOs) are connected
 
     // attribute 1 - vec3 colour
