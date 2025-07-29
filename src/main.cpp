@@ -19,13 +19,27 @@ struct Vertex {
     float r, g, b;
 };
 
-constexpr Vertex vertices[4] = {
-    { -0.5f, -0.5f, 0.0f, 1,0,0 },
-    {  0.5f, -0.5f, 0.0f, 0,1,0 },
-    {  0.5f,  0.5f, 0.0f, 0,0,1 },
-    { -0.5f,  0.5f, 0.0f, 1,1,0 }
+constexpr Vertex cube_vertices[8] = {
+    { -1.0f,  1.0f,  1.0f, 1,0,0 },
+    {  1.0f,  1.0f,  1.0f, 0,1,0 },
+    {  1.0f, -1.0f,  1.0f, 0,0,1 },
+    { -1.0f, -1.0f,  1.0f, 1,0.5f,0 },
+
+    { -1.0f,  1.0f, -1.0f, 0.5f,0,1 },
+    {  1.0f,  1.0f, -1.0f, 1,1,0 },
+    {  1.0f, -1.0f, -1.0f, 0,1,0.5f },
+    { -1.0f, -1.0f, -1.0f, 0.5f,0.5f,1 },
 };
-constexpr GLuint indices[6] = { 0, 1, 2,  2, 3, 0 };
+
+constexpr int kNumCube = 3 * 12;
+constexpr GLuint cube_indices[kNumCube] = {
+    0, 2, 1,  0, 3, 2, // front
+    5, 6, 7,  5, 7, 4, // back
+    4, 1, 5,  4, 0, 1, // top
+    3, 6, 2,  3, 7, 6, // bottom
+    4, 3, 0,  4, 7, 3, // left
+    1, 6, 5,  1, 2, 6  // right
+};
 
 void framebuffer_size_callback(GLFWwindow*, int w, int h)
 {
@@ -41,6 +55,7 @@ try {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+    glfwWindowHint(GLFW_DEPTH_BITS, 24);
 
     GLFWwindow* window = glfwCreateWindow(kWidth, kHeight, "Space Sim", nullptr, nullptr);
     if (!window) {
@@ -61,8 +76,12 @@ try {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSwapInterval(1); // v-sync
 
-    std::string vertexShader = read_file_to_string("shaders/basic/triangle.vert"); 
-    std::string fragmentShader = read_file_to_string("shaders/basic/triangle.frag"); 
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    std::string vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
+    std::string fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
 
     GLuint prog = make_program(
         compile_shader(GL_VERTEX_SHADER, vertexShader),
@@ -71,7 +90,7 @@ try {
 
     GLuint vbo, vao, ebo;
     glCreateBuffers(1, &vbo);
-    glNamedBufferStorage(vbo, sizeof(vertices), vertices, 0);
+    glNamedBufferStorage(vbo, sizeof(cube_vertices), cube_vertices, 0);
 
     glCreateVertexArrays(1, &vao);
     glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
@@ -87,7 +106,7 @@ try {
     glVertexArrayAttribBinding(vao, 1, 0);
 
     glCreateBuffers(1, &ebo);
-    glNamedBufferStorage(ebo, sizeof(indices), indices, 0);
+    glNamedBufferStorage(ebo, sizeof(cube_indices), cube_indices, 0);
     glVertexArrayElementBuffer(vao, ebo);
 
     Camera cam({0.0f, 0.0f, 3.0f}, {0.0f, 1.0f, 0.0f});
@@ -111,14 +130,15 @@ try {
 
 
         glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // wire-mesh
         glUseProgram(prog);
         double now = glfwGetTime();  // time in seconds since glfwInit
         glUniform1f(glGetUniformLocation(prog, "uTime"), static_cast<float>(now));
 
         glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, kNumCube, GL_UNSIGNED_INT, nullptr);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -38,8 +38,16 @@ void Camera::keyInput(GLFWwindow* window, float deltaTime)
         position -= up * speed;
 }
 
+static bool firstMouse = true;
+
 void Camera::on_mouse_move(double xpos, double ypos)
 {
+    if (firstMouse) {
+        mls.lastX = float(xpos);
+        mls.lastY = float(ypos);
+        firstMouse = false;
+    }
+
     float xoffset = float(xpos) - mls.lastX;
     float yoffset = mls.lastY - float(ypos);
     mls.lastX = float(xpos);
