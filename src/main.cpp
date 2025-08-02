@@ -205,6 +205,12 @@ private:
 
         state.swap();
         // physics
+
+        glm::quat drot = glm::angleAxis(glm::radians(1.0f), glm::vec3(1.0f, 0.0f, 0.0f))
+                       * glm::angleAxis(glm::radians(1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        for (Transform& tf: state.transforms) {
+            tf.rot = glm::normalize(drot * tf.rot);
+        }
     }
 
     void render(float alpha)
