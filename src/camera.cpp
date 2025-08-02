@@ -6,7 +6,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-constexpr int kCameraMul = 2.5f;
+
+constexpr float kCameraMul = 2.5f;
 constexpr float kMouseSensitivity = 0.1f;
 
 
@@ -36,6 +37,13 @@ void Camera::keyInput(GLFWwindow* window, float deltaTime)
         position += up * speed;
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         position -= up * speed;
+}
+
+void Camera::window_setup(GLFWwindow* window)
+{
+    glfwSetWindowUserPointer(window, this);
+    glfwSetCursorPosCallback(window, Camera::mouse_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 static bool firstMouse = true;

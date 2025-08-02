@@ -1,53 +1,31 @@
+#include <windows.h>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <constants.hpp>
-#include <shaders.hpp>
 #include <camera.hpp>
+#include <constants.hpp>
+#include <mesh.hpp>
+#include <models.hpp>
 #include <read_file_to_string.hpp>
+#include <shaders.hpp>
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 
 
-struct Vertex {
-    float x, y, z;
-    float r, g, b;
-};
-
-constexpr Vertex cube_vertices[8] = {
-    { -1.0f,  1.0f,  1.0f, 1,0,0 },
-    {  1.0f,  1.0f,  1.0f, 0,1,0 },
-    {  1.0f, -1.0f,  1.0f, 0,0,1 },
-    { -1.0f, -1.0f,  1.0f, 1,0.5f,0 },
-
-    { -1.0f,  1.0f, -1.0f, 0.5f,0,1 },
-    {  1.0f,  1.0f, -1.0f, 1,1,0 },
-    {  1.0f, -1.0f, -1.0f, 0,1,0.5f },
-    { -1.0f, -1.0f, -1.0f, 0.5f,0.5f,1 },
-};
-
-constexpr int kNumCube = 3 * 12;
-constexpr GLuint cube_indices[kNumCube] = {
-    0, 2, 1,  0, 3, 2, // front
-    5, 6, 7,  5, 7, 4, // back
-    4, 1, 5,  4, 0, 1, // top
-    3, 6, 2,  3, 7, 6, // bottom
-    4, 3, 0,  4, 7, 3, // left
-    1, 6, 5,  1, 2, 6  // right
-};
-
-void framebuffer_size_callback(GLFWwindow*, int w, int h)
+GLFWwindow* create_window()
 {
-    glViewport(0, 0, w, h);
-}
-
-int main()
-try {
     if (!glfwInit())
         throw std::runtime_error("GLFW initilisation failed");
     
@@ -63,6 +41,197 @@ try {
         throw std::runtime_error("Unable to create GLFW window");
     }
 
+    return window;
+}
+
+void framebuffer_size_callback(GLFWwindow*, int w, int h)
+{
+    glViewport(0, 0, w, h);
+}
+
+void GLAPIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
+    GLsizei length, const GLchar* message, const void* userParam)
+{
+    std::cerr << "[GL DEBUG] " << message << std::endl;
+    if (severity == GL_DEBUG_SEVERITY_HIGH)
+        std::terminate();
+}
+
+
+class Sim {
+    const std::uint32_t tps;
+    const std::chrono::nanoseconds target_frame_ns;
+    const double fixed_dt;
+    const std::uint32_t panic_update_cap;
+    std::atomic_bool running{true};
+
+    GLFWwindow* window;
+    GLuint shader_program;
+    glm::mat4 proj_mat;
+
+    Cube cube{{0, 0, -3.0f}, {0, 0, 0}, 1.0f};
+    Camera cam{{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+
+public:
+    explicit Sim(GLFWwindow* window,
+                 std::uint32_t tps = 60,
+                 std::uint32_t target_fps = 144,
+                 std::uint32_t max_updates_per_fl = 5)
+        : window(window),
+          tps(tps),
+          target_frame_ns{1'000'000'000ull / target_fps},
+          fixed_dt{1.0 / static_cast<double>(tps)},
+          panic_update_cap{max_updates_per_fl}
+    {
+        std::string vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
+        std::string fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
+
+        shader_program = make_program(
+            compile_shader(GL_VERTEX_SHADER, vertexShader),
+            compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
+        );
+
+        cam.window_setup(window);
+
+        proj_mat = glm::perspective(glm::radians(60.0f), float(kWidth)/kHeight, 0.1f, 100.0f);
+    }
+
+    ~Sim()
+    {
+        glDeleteProgram(shader_program);
+    }
+
+    void run()
+    {
+        using clock = std::chrono::steady_clock;
+
+        auto previous_time  = clock::now();
+        std::chrono::nanoseconds lag{0};
+
+        std::uint32_t tick_counter = 0;
+        std::uint32_t render_counter = 0;
+        std::chrono::steady_clock::time_point last_stats_time = clock::now();
+
+        // constexpr auto safety_margin = std::chrono::microseconds{500};
+
+        while (running) {
+            auto current_time = clock::now();
+            auto elapsed = current_time - previous_time;
+            previous_time = current_time;
+            lag += elapsed;
+
+            std::uint32_t updates_this_frame = 0;
+            while (lag >= tick_interval() && updates_this_frame < panic_update_cap) {
+                tick(static_cast<float>(fixed_dt));
+                lag -= tick_interval();
+                ++updates_this_frame;
+
+                ++tick_counter;
+            }
+
+            // Spiral-of-death guard
+            if (updates_this_frame >= panic_update_cap) {
+                lag = std::chrono::nanoseconds{0}; // drop excess lag
+            }
+
+            const double alpha = static_cast<double>(lag.count())
+                               / static_cast<double>(tick_interval().count());
+            render(static_cast<float>(alpha)); // alpha in [0,1)
+            ++render_counter;
+
+            auto now = clock::now();
+            if (now - last_stats_time >= std::chrono::seconds{1}) {
+                std::cout << "TPS: " << tick_counter << " | FPS: " << render_counter << std::endl;
+                tick_counter = 0;
+                render_counter = 0;
+                last_stats_time = now;
+            }
+
+            // FPS limiter
+            // auto frame_deadline = current_time + target_frame_ns;
+            // while (clock::now() + safety_margin < frame_deadline) {
+            //     std::this_thread::sleep_for(std::chrono::microseconds{200});
+            // }
+        }
+    }
+
+    static void setup_window(GLFWwindow* window)
+    {
+        int fbWidth, fbHeight;
+        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+        glViewport(0, 0, fbWidth, fbHeight);
+
+        glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+        glfwSwapInterval(1); // v-sync
+
+        // z-buffer depth test
+        glEnable(GL_DEPTH_TEST);
+
+        // back-face culling
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        glEnable(GL_DEBUG_OUTPUT);
+        glDebugMessageCallback(debug_callback, nullptr);
+    }
+
+    void stop() noexcept { running = false; }
+
+private:
+    void tick(float dt)
+    try {
+        glfwPollEvents();
+        if (glfwWindowShouldClose(window) || glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            stop();
+            return;
+        }
+        cam.keyInput(window, dt);
+
+    } catch(std::exception& e) {
+        std::cerr << "[FATAL] Sim::tick:" << e.what() << std::endl;
+        stop();
+        return;
+    }
+
+    void render(float alpha)
+    try {
+        if (!running) return;
+
+        glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(shader_program);
+
+        glm::mat4 view = cam.getView();
+        glm::mat4 vp = proj_mat * view;
+        
+        // cube draw
+        glm::mat4 model = cube.get_model_mat4();
+        glm::mat4 mvp = vp * model;
+        glUniformMatrix4fv(glGetUniformLocation(shader_program, "uMVP"), 1, GL_FALSE,  glm::value_ptr(mvp));
+        cube.draw();
+
+        glfwSwapBuffers(window);
+     
+    } catch(std::exception& e) {
+        std::cerr << "[FATAL] Sim::render:" << e.what() << std::endl;
+        stop();
+        return;
+    }
+
+    constexpr std::chrono::nanoseconds tick_interval() const
+    {
+        return std::chrono::nanoseconds(
+                   static_cast<std::int64_t>(1'000'000'000ull / tps));
+    }
+};
+
+int main()
+try {
+#ifdef _WIN32
+    timeBeginPeriod(1);
+#endif
+
+    GLFWwindow* window = create_window();
     glfwMakeContextCurrent(window);
 
     if (!gladLoadGL()) {
@@ -70,92 +239,20 @@ try {
         throw std::runtime_error("gladLoadGL failed");
     }
 
-    int fbWidth, fbHeight;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
-    glViewport(0, 0, fbWidth, fbHeight);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSwapInterval(1); // v-sync
+    Sim::setup_window(window);
 
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-    std::string vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
-    std::string fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
-
-    GLuint prog = make_program(
-        compile_shader(GL_VERTEX_SHADER, vertexShader),
-        compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
-    );
-
-    GLuint vbo, vao, ebo;
-    glCreateBuffers(1, &vbo);
-    glNamedBufferStorage(vbo, sizeof(cube_vertices), cube_vertices, 0);
-
-    glCreateVertexArrays(1, &vao);
-    glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
-
-    // attribute 0 - vec2 position
-    glEnableVertexArrayAttrib(vao, 0); // Activates attribute slot attribIndex for this VAO
-    glVertexArrayAttribFormat(vao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, x)); // Tells OpenGL how to interpret the memory at each vertex for this attribute
-    glVertexArrayAttribBinding(vao, 0, 0); // Assigns the attribute to a specific binding point - “slots” where buffers (VBOs) are connected
-
-    // attribute 1 - vec3 colour
-    glEnableVertexArrayAttrib(vao, 1);
-    glVertexArrayAttribFormat(vao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, r));
-    glVertexArrayAttribBinding(vao, 1, 0);
-
-    glCreateBuffers(1, &ebo);
-    glNamedBufferStorage(ebo, sizeof(cube_indices), cube_indices, 0);
-    glVertexArrayElementBuffer(vao, ebo);
-
-    Camera cam({0.0f, 0.0f, 3.0f}, {0.0f, 1.0f, 0.0f});
-    glfwSetWindowUserPointer(window, &cam);
-    glfwSetCursorPosCallback(window, Camera::mouse_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    bool running = true;
-    float lastTime = glfwGetTime();
-    while (!glfwWindowShouldClose(window) && running) {
-        float currentTime = glfwGetTime();
-        float dt = currentTime - lastTime;
-        lastTime = currentTime;
-
-        cam.keyInput(window, dt);
-        glm::mat4 view = cam.getView();
-        glm::mat4 proj = glm::perspective(glm::radians(60.0f), float(kWidth)/kHeight, 0.1f, 100.0f);
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 mvp = proj * view * model;
-        glUniformMatrix4fv(glGetUniformLocation(prog, "uMVP"), 1, GL_FALSE, glm::value_ptr(mvp));
-
-
-        glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // wire-mesh
-        glUseProgram(prog);
-        double now = glfwGetTime();  // time in seconds since glfwInit
-        glUniform1f(glGetUniformLocation(prog, "uTime"), static_cast<float>(now));
-
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, kNumCube, GL_UNSIGNED_INT, nullptr);
-
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            running = false;
-    }
-
-    glDeleteProgram(prog);
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
+    Sim sim(window, 60, 144);
+    sim.run();
 
     glfwDestroyWindow(window);
     glfwTerminate();
+
+#ifdef _WIN32
+    timeEndPeriod(1);
+#endif
     return EXIT_SUCCESS;
 
 } catch (std::exception& e) {
-    std::cerr << "[FATAL] " << e.what() << std::endl;
+    std::cerr << "[FATAL] main:" << e.what() << std::endl;
     return EXIT_FAILURE;
 }

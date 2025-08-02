@@ -1,5 +1,4 @@
 #pragma once
-
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
@@ -20,6 +19,7 @@ struct Camera {
     glm::mat4 getView() const;
     void keyInput(GLFWwindow* window, float deltaTime);
 
+    void window_setup(GLFWwindow* window);
     static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
         auto* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
         if (cam)
