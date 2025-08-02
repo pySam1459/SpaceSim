@@ -1,6 +1,11 @@
 #pragma once
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+
+#include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
+
+#include "opengl_fwd.hpp"
+
+struct GLFWwindow;
 
 struct MouseLookState {
     float yaw, pitch;
@@ -20,10 +25,6 @@ struct Camera {
     void keyInput(GLFWwindow* window, float deltaTime);
 
     void window_setup(GLFWwindow* window);
-    static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
-        auto* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
-        if (cam)
-            cam->on_mouse_move(xpos, ypos);
-    }
+    static void mouse_callback(GLFWwindow *window, double xpos, double ypos);
     void on_mouse_move(double xpos, double ypos);
 };

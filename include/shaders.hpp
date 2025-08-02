@@ -1,10 +1,21 @@
 #pragma once
 
-#include <glad/glad.h>
-
 #include <string_view>
 
+#include <glm/fwd.hpp>
+
+#include "opengl_fwd.hpp"
+
+
+struct ShaderProgram {
+    GLuint id{};
+    GLint u_mvp{};
+
+    explicit ShaderProgram(GLuint prog_id);
+    ~ShaderProgram();
+
+    void set_mvp(const glm::mat4& mvp) const;
+};
 
 GLuint compile_shader(GLenum type, std::string_view src);
-
-GLuint make_program(GLuint vs, GLuint fs);
+ShaderProgram make_program(GLuint vs, GLuint fs);

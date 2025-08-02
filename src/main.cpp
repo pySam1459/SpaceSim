@@ -1,19 +1,8 @@
-#include <windows.h>
-#include <mmsystem.h>
-#pragma comment(lib, "winmm.lib")
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#include <camera.hpp>
-#include <constants.hpp>
-#include <mesh.hpp>
-#include <models.hpp>
-#include <read_file_to_string.hpp>
-#include <shaders.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -22,6 +11,14 @@
 #include <stdexcept>
 #include <string_view>
 #include <thread>
+
+#include "camera.hpp"
+#include "constants.hpp"
+#include "mesh.hpp"
+#include "models.hpp"
+#include "read_file_to_string.hpp"
+#include "shaders.hpp"
+#include "state.hpp"
 
 
 GLFWwindow* create_window()
@@ -58,6 +55,30 @@ void GLAPIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum sev
 }
 
 
+namespace {
+ShaderProgram load_basic_shader()
+{
+    auto vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
+    auto fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
+
+    return make_program(
+        compile_shader(GL_VERTEX_SHADER, vertexShader),
+        compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
+    );
+}
+
+State create_state()
+{
+    State state;
+    state.transforms.push_back(Transform{{0, 0, -3.0f}, {1.0f, 0, 0, 0}, 1.0f});
+    state.transforms.push_back(Transform{{5, 0, -3.0f}, {1.0f, 0.5f, 0, 0}, 0.5f});
+    
+    state.models.push_back(std::make_unique<Cube>(0));
+    state.models.push_back(std::make_unique<Cube>(1));
+    return state;
+}
+}
+
 class Sim {
     const std::uint32_t tps;
     const std::chrono::nanoseconds target_frame_ns;
@@ -66,10 +87,10 @@ class Sim {
     std::atomic_bool running{true};
 
     GLFWwindow* window;
-    GLuint shader_program;
+    ShaderProgram shader_program;
     glm::mat4 proj_mat;
 
-    Cube cube{{0, 0, -3.0f}, {0, 0, 0}, 1.0f};
+    State state;
     Camera cam{{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
 
 public:
@@ -81,25 +102,16 @@ public:
           tps(tps),
           target_frame_ns{1'000'000'000ull / target_fps},
           fixed_dt{1.0 / static_cast<double>(tps)},
-          panic_update_cap{max_updates_per_fl}
+          panic_update_cap{max_updates_per_fl},
+          shader_program{ load_basic_shader() },
+          state{ create_state() }
     {
-        std::string vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
-        std::string fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
-
-        shader_program = make_program(
-            compile_shader(GL_VERTEX_SHADER, vertexShader),
-            compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
-        );
-
         cam.window_setup(window);
 
         proj_mat = glm::perspective(glm::radians(60.0f), float(kWidth)/kHeight, 0.1f, 100.0f);
     }
 
-    ~Sim()
-    {
-        glDeleteProgram(shader_program);
-    }
+    ~Sim() {}
 
     void run()
     {
@@ -112,6 +124,7 @@ public:
         std::uint32_t render_counter = 0;
         std::chrono::steady_clock::time_point last_stats_time = clock::now();
 
+        bool has_ticked{false};
         // constexpr auto safety_margin = std::chrono::microseconds{500};
 
         while (running) {
@@ -125,6 +138,7 @@ public:
                 tick(static_cast<float>(fixed_dt));
                 lag -= tick_interval();
                 ++updates_this_frame;
+                has_ticked = true;
 
                 ++tick_counter;
             }
@@ -134,10 +148,12 @@ public:
                 lag = std::chrono::nanoseconds{0}; // drop excess lag
             }
 
-            const double alpha = static_cast<double>(lag.count())
-                               / static_cast<double>(tick_interval().count());
-            render(static_cast<float>(alpha)); // alpha in [0,1)
-            ++render_counter;
+            if (has_ticked) {
+                const double alpha = static_cast<double>(lag.count())
+                                / static_cast<double>(tick_interval().count());
+                render(static_cast<float>(alpha)); // alpha in [0,1)
+                ++render_counter;
+            }
 
             auto now = clock::now();
             if (now - last_stats_time >= std::chrono::seconds{1}) {
@@ -179,7 +195,7 @@ public:
 
 private:
     void tick(float dt)
-    try {
+    {
         glfwPollEvents();
         if (glfwWindowShouldClose(window) || glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             stop();
@@ -187,35 +203,30 @@ private:
         }
         cam.keyInput(window, dt);
 
-    } catch(std::exception& e) {
-        std::cerr << "[FATAL] Sim::tick:" << e.what() << std::endl;
-        stop();
-        return;
+        state.swap();
+        // physics
     }
 
     void render(float alpha)
-    try {
+    {
         if (!running) return;
 
         glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(shader_program);
+
+        glUseProgram(shader_program.id);
 
         glm::mat4 view = cam.getView();
         glm::mat4 vp = proj_mat * view;
-        
-        // cube draw
-        glm::mat4 model = cube.get_model_mat4();
-        glm::mat4 mvp = vp * model;
-        glUniformMatrix4fv(glGetUniformLocation(shader_program, "uMVP"), 1, GL_FALSE,  glm::value_ptr(mvp));
-        cube.draw();
+
+        for (const auto& model : state.models) {
+            const Transform tf = interpolate(state.prev_tfs[model->idx], state.transforms[model->idx], alpha);
+            const glm::mat4 mvp = vp * tf.to_model_mat4();
+            shader_program.set_mvp(mvp);
+            model->draw();
+        }
 
         glfwSwapBuffers(window);
-     
-    } catch(std::exception& e) {
-        std::cerr << "[FATAL] Sim::render:" << e.what() << std::endl;
-        stop();
-        return;
     }
 
     constexpr std::chrono::nanoseconds tick_interval() const
@@ -227,10 +238,6 @@ private:
 
 int main()
 try {
-#ifdef _WIN32
-    timeBeginPeriod(1);
-#endif
-
     GLFWwindow* window = create_window();
     glfwMakeContextCurrent(window);
 
@@ -246,10 +253,6 @@ try {
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
-#ifdef _WIN32
-    timeEndPeriod(1);
-#endif
     return EXIT_SUCCESS;
 
 } catch (std::exception& e) {

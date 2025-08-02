@@ -1,7 +1,28 @@
-#include <glad/glad.h>
+#include "shaders.hpp"
 
 #include <stdexcept>
 #include <string_view>
+
+#include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+
+ShaderProgram::ShaderProgram(GLuint prog_id) : id(prog_id)
+{
+    u_mvp = glGetUniformLocation(id, "u_mvp");
+}
+
+ShaderProgram::~ShaderProgram()
+{
+    if (id)
+        glDeleteProgram(id);
+}
+
+void ShaderProgram::set_mvp(const glm::mat4& mvp) const
+{
+    glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
+}
 
 
 GLuint compile_shader(GLenum type, std::string_view src)
@@ -21,7 +42,7 @@ GLuint compile_shader(GLenum type, std::string_view src)
     return id;
 }
 
-GLuint make_program(GLuint vs, GLuint fs)
+ShaderProgram make_program(GLuint vs, GLuint fs)
 {
     GLuint prog = glCreateProgram();
     glAttachShader(prog, vs);
@@ -40,5 +61,6 @@ GLuint make_program(GLuint vs, GLuint fs)
     glDetachShader(prog, fs);
     glDeleteShader(vs);
     glDeleteShader(fs);
-    return prog;
+
+    return ShaderProgram{prog};
 }

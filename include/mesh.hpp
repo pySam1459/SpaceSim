@@ -1,5 +1,7 @@
 #pragma once
-#include <glad/glad.h>
+
+#include "opengl_fwd.hpp"
+
 
 struct Vertex {
     float x, y, z;

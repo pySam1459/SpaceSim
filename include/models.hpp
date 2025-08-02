@@ -1,42 +1,23 @@
 #pragma once
-#include <glad/glad.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/quaternion.hpp>
-
-#include <mesh.hpp>
 
 #include <iterator>
 
+#include "mesh.hpp"
+#include "opengl_fwd.hpp"
+
 
 struct Model {
-    glm::vec3 pos;
-    glm::vec3 rot;
-    float scale;
-
+    std::uint32_t idx;
     Mesh mesh;
 
     Model(const Vertex* vertices,
           size_t        vertex_count,
           const GLuint* indices,
           size_t        index_count,
-          glm::vec3     pos, 
-          glm::vec3     rot   = {0,0,0},
-          float         scale = 1.0f)
-        : pos  (pos)
-        , rot  (rot)
-        , scale(scale)
+          const std::uint32_t idx)
+        : idx(idx)
         , mesh (vertices, vertex_count, indices, index_count)
     {}
-
-    glm::mat4 get_model_mat4() const {
-        glm::quat q = glm::quat(glm::radians(rot));
-        return glm::translate(glm::mat4(1.0f), pos)
-             * glm::toMat4(q)
-             * glm::scale(glm::mat4(1.0f), glm::vec3(scale));
-    }
 
     void draw() {
         mesh.draw();
@@ -66,8 +47,8 @@ constexpr GLuint cube_indices[36] = {
 };
 
 struct Cube : public Model {
-    Cube(glm::vec3 pos, glm::vec3 rot, float scale)
+    Cube(std::uint32_t idx)
         : Model(cube_vertices, std::size(cube_vertices),
                 cube_indices, std::size(cube_indices),
-                pos, rot, scale) {}
+                idx) {}
 };

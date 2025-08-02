@@ -1,10 +1,11 @@
-#include <camera.hpp>
-#include <constants.hpp>
+#include "camera.hpp"
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include "constants.hpp"
 
 
 constexpr float kCameraMul = 2.5f;
@@ -44,6 +45,12 @@ void Camera::window_setup(GLFWwindow* window)
     glfwSetWindowUserPointer(window, this);
     glfwSetCursorPosCallback(window, Camera::mouse_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+}
+
+void Camera::mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+    auto* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
+    if (cam)
+        cam->on_mouse_move(xpos, ypos);
 }
 
 static bool firstMouse = true;
