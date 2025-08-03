@@ -7,8 +7,8 @@
 
 glm::mat4 Transform::to_model_mat4() const {
     return glm::translate(glm::mat4(1.0f), pos)
-            * glm::mat4_cast(rot)
-            * glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+         * glm::mat4_cast(rot)
+         * glm::scale(glm::mat4(1.0f), glm::vec3(scale));
 }
 
 Transform interpolate(const Transform& a,

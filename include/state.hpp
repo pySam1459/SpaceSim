@@ -5,6 +5,7 @@
 
 #include "models.hpp"
 #include "transform.hpp"
+#include "opengl_fwd.hpp"
 
 
 struct State {
@@ -16,4 +17,14 @@ struct State {
     std::vector<std::unique_ptr<Model>> models;
 
     inline void swap() { prev_tfs = transforms; }
+
+    State() = default;
+    ~State() = default;
+
+    // no copy allowed
+    State(const State&)            = delete;
+    State& operator=(const State&) = delete;
+
+    State(State&&) noexcept        = default;
+    State& operator=(State&&) noexcept = default;
 };

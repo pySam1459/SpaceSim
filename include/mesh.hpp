@@ -5,7 +5,6 @@
 
 struct Vertex {
     float x, y, z;
-    float r, g, b;
 };
 
 struct Mesh {
@@ -20,5 +19,5 @@ struct Mesh {
          const size_t  index_count);
     ~Mesh();
 
-    void draw();
+    void draw() const;
 };

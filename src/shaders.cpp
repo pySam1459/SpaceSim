@@ -11,6 +11,7 @@
 ShaderProgram::ShaderProgram(GLuint prog_id) : id(prog_id)
 {
     u_mvp = glGetUniformLocation(id, "u_mvp");
+    u_color = glGetUniformLocation(id, "u_color");
 }
 
 ShaderProgram::~ShaderProgram()
@@ -22,6 +23,11 @@ ShaderProgram::~ShaderProgram()
 void ShaderProgram::set_mvp(const glm::mat4& mvp) const
 {
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
+}
+
+void ShaderProgram::set_color(const glm::vec3& color) const
+{
+    glUniform3fv(u_color, 1, glm::value_ptr(color));
 }
 
 

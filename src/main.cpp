@@ -73,8 +73,9 @@ State create_state()
     state.transforms.push_back(Transform{{0, 0, -3.0f}, {1.0f, 0, 0, 0}, 1.0f});
     state.transforms.push_back(Transform{{5, 0, -3.0f}, {1.0f, 0.5f, 0, 0}, 0.5f});
     
-    state.models.push_back(std::make_unique<Cube>(0));
-    state.models.push_back(std::make_unique<Cube>(1));
+    for (int i=0; i<kNumObjects; ++i) {
+        state.models.push_back(std::make_unique<Cube>(i));
+    }
     return state;
 }
 }
@@ -229,6 +230,7 @@ private:
             const Transform tf = interpolate(state.prev_tfs[model->idx], state.transforms[model->idx], alpha);
             const glm::mat4 mvp = vp * tf.to_model_mat4();
             shader_program.set_mvp(mvp);
+            shader_program.set_color(colours[model->idx]);
             model->draw();
         }
 

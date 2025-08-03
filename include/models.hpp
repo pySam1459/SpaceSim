@@ -15,26 +15,26 @@ struct Model {
           const GLuint* indices,
           size_t        index_count,
           const std::uint32_t idx)
-        : idx(idx)
-        , mesh (vertices, vertex_count, indices, index_count)
+        : idx(idx),
+          mesh (vertices, vertex_count, indices, index_count)
     {}
 
-    void draw() {
+    void draw() const {
         mesh.draw();
     }
 };
 
 
 constexpr Vertex cube_vertices[8] = {
-    { -1.0f,  1.0f,  1.0f, 1,0,0 },
-    {  1.0f,  1.0f,  1.0f, 0,1,0 },
-    {  1.0f, -1.0f,  1.0f, 0,0,1 },
-    { -1.0f, -1.0f,  1.0f, 1,0.5f,0 },
+    { -1.0f,  1.0f,  1.0f },
+    {  1.0f,  1.0f,  1.0f },
+    {  1.0f, -1.0f,  1.0f },
+    { -1.0f, -1.0f,  1.0f },
 
-    { -1.0f,  1.0f, -1.0f, 0.5f,0,1 },
-    {  1.0f,  1.0f, -1.0f, 1,1,0 },
-    {  1.0f, -1.0f, -1.0f, 0,1,0.5f },
-    { -1.0f, -1.0f, -1.0f, 0.5f,0.5f,1 },
+    { -1.0f,  1.0f, -1.0f },
+    {  1.0f,  1.0f, -1.0f },
+    {  1.0f, -1.0f, -1.0f },
+    { -1.0f, -1.0f, -1.0f },
 };
 
 constexpr GLuint cube_indices[36] = {
@@ -47,7 +47,7 @@ constexpr GLuint cube_indices[36] = {
 };
 
 struct Cube : public Model {
-    Cube(std::uint32_t idx)
+    Cube(std::uint32_t idx) noexcept
         : Model(cube_vertices, std::size(cube_vertices),
                 cube_indices, std::size(cube_indices),
                 idx) {}
