@@ -25,6 +25,6 @@ struct State {
     State(const State&)            = delete;
     State& operator=(const State&) = delete;
 
-    State(State&&) noexcept        = default;
+    State(State&&) noexcept            = default;
     State& operator=(State&&) noexcept = default;
 };

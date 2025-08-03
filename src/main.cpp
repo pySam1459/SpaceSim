@@ -58,11 +58,11 @@ void GLAPIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum sev
 namespace {
 ShaderProgram load_basic_shader()
 {
-    auto vertexShader = read_file_to_string("shaders/basic/basic.vert"); 
-    auto fragmentShader = read_file_to_string("shaders/basic/basic.frag"); 
+    auto vertexShader   = read_file_to_string("shaders/basic/basic.vert");
+    auto fragmentShader = read_file_to_string("shaders/basic/basic.frag");
 
     return make_program(
-        compile_shader(GL_VERTEX_SHADER, vertexShader),
+        compile_shader(GL_VERTEX_SHADER,   vertexShader),
         compile_shader(GL_FRAGMENT_SHADER, fragmentShader)
     );
 }
@@ -73,8 +73,8 @@ State create_state()
     state.transforms.push_back(Transform{{0, 0, -3.0f}, {1.0f, 0, 0, 0}, 1.0f});
     state.transforms.push_back(Transform{{5, 0, -3.0f}, {1.0f, 0.5f, 0, 0}, 0.5f});
     
-    for (int i=0; i<kNumObjects; ++i) {
-        state.models.push_back(std::make_unique<Cube>(i));
+    for (std::uint32_t i=0; i<kNumObjects; ++i) {
+        state.models.push_back(create_sphere(i));
     }
     return state;
 }
@@ -118,7 +118,7 @@ public:
     {
         using clock = std::chrono::steady_clock;
 
-        auto previous_time  = clock::now();
+        auto previous_time = clock::now();
         std::chrono::nanoseconds lag{0};
 
         std::uint32_t tick_counter = 0;
@@ -145,13 +145,12 @@ public:
             }
 
             // Spiral-of-death guard
-            if (updates_this_frame >= panic_update_cap) {
+            if (updates_this_frame >= panic_update_cap)
                 lag = std::chrono::nanoseconds{0}; // drop excess lag
-            }
 
-            if (has_ticked) {
+            if (has_ticked && running) {
                 const double alpha = static_cast<double>(lag.count())
-                                / static_cast<double>(tick_interval().count());
+                                   / static_cast<double>(tick_interval().count());
                 render(static_cast<float>(alpha)); // alpha in [0,1)
                 ++render_counter;
             }
@@ -216,8 +215,6 @@ private:
 
     void render(float alpha)
     {
-        if (!running) return;
-
         glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
