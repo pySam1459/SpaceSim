@@ -72,8 +72,13 @@ ShaderProgram load_basic_shader()
 State create_state()
 {
     State state;
-    state.transforms.push_back(Transform{{0, 0, -3.0f}, {1.0f, 0, 0, 0}, 1.0f});
-    state.transforms.push_back(Transform{{5, 0, -3.0f}, {1.0f, 0.5f, 0, 0}, 0.5f});
+    state.transforms.push_back(Transform{{0, 0, 0}, {1.0f, 0, 0, 0}, 2.5f});
+    state.transforms.push_back(Transform{{10, 5, 0}, {1.0f, 0, 0, 0}, 1.0f});
+    state.transforms.push_back(Transform{{-15, -5, 0}, {1.0f, 0, 0, 0}, 1.0f});
+
+    state.props.push_back(PhysicsProps{{0, 0, 0}, 100.0f});
+    state.props.push_back(PhysicsProps{{0, -0.25f, -7.5f}, 1.0f});
+    state.props.push_back(PhysicsProps{{0, 0.25f, 6.5f}, 1.0f});
     
     for (std::uint32_t i=0; i<kNumObjects; ++i) {
         state.models.push_back(create_sphere(i, i==0));
@@ -94,7 +99,7 @@ class Sim {
     glm::mat4 proj_mat;
 
     State state;
-    Camera cam{{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+    Camera cam{{0.0f, 0.0f, 20.0f}, {0.0f, 1.0f, 0.0f}};
 
 public:
     explicit Sim(GLFWwindow* window,
@@ -208,7 +213,7 @@ private:
         state.swap();
         // physics
 
-        state.transforms[1].pos.x += 0.01;
+        state.tick(dt);
     }
 
     void render(float alpha)
