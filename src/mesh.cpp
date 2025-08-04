@@ -20,9 +20,14 @@ Mesh::Mesh(const Vertex* vertices,
     glCreateBuffers(1, &vbo);
     glNamedBufferStorage(vbo, vertex_count * sizeof(Vertex), vertices, 0);
     glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
+
     glEnableVertexArrayAttrib(vao, 0); // Activates attribute slot attribIndex for this VAO
     glVertexArrayAttribFormat(vao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, x)); // Tells OpenGL how to interpret the memory at each vertex for this attribute
     glVertexArrayAttribBinding(vao, 0, 0); // Assigns the attribute to a specific binding point - “slots” where buffers (VBOs) are connected
+
+    glEnableVertexArrayAttrib(vao, 1); // normal
+    glVertexArrayAttribFormat(vao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
+    glVertexArrayAttribBinding(vao, 1, 0);
 
     // element buffer
     glCreateBuffers(1, &ebo);

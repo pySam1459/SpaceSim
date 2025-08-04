@@ -11,14 +11,17 @@
 struct Model {
     std::uint32_t idx;
     Mesh mesh;
+    bool is_light_source;
 
     Model(const Vertex* vertices,
           size_t        vertex_count,
           const GLuint* indices,
           size_t        index_count,
-          const std::uint32_t idx)
-        : idx(idx),
-          mesh (vertices, vertex_count, indices, index_count)
+          const std::uint32_t idx,
+          const bool is_light_source)
+        : idx{idx},
+          is_light_source{is_light_source},
+          mesh(vertices, vertex_count, indices, index_count)
     {}
 
     void draw() const {
@@ -33,6 +36,7 @@ struct Cube : Model {
 
 struct Sphere : Model {
     Sphere(std::uint32_t idx,
+           bool is_light_source,
            std::vector<Vertex>& vertices,
            std::vector<GLuint>& indices) noexcept;
 
@@ -43,4 +47,4 @@ struct Sphere : Model {
     Sphere& operator=(Sphere&&) noexcept = default;
 };
 
-std::unique_ptr<Sphere> create_sphere(std::uint32_t idx);
+std::unique_ptr<Sphere> create_sphere(std::uint32_t idx, bool is_light_source);

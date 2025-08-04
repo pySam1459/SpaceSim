@@ -1,5 +1,6 @@
 #include "shaders.hpp"
 
+#include <iostream>
 #include <stdexcept>
 #include <string_view>
 
@@ -10,8 +11,11 @@
 
 ShaderProgram::ShaderProgram(GLuint prog_id) : id(prog_id)
 {
-    u_mvp = glGetUniformLocation(id, "u_mvp");
-    u_color = glGetUniformLocation(id, "u_color");
+    for (std::size_t i=0; i<kNumUniforms; ++i) {
+        uniforms[i] = glGetUniformLocation(id, uniform_names[i].data());
+        if (uniforms[i] == -1)
+            std::cerr << "Warning: No uniform found with name `" << uniform_names[i] << "`\n";
+    }
 }
 
 ShaderProgram::~ShaderProgram()
@@ -20,14 +24,20 @@ ShaderProgram::~ShaderProgram()
         glDeleteProgram(id);
 }
 
-void ShaderProgram::set_mvp(const glm::mat4& mvp) const
+void ShaderProgram::set_mat4(std::string_view u_name, const glm::mat4& mat) const
 {
-    glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
+    GLint handle = uniform_location(u_name);
+    glUniformMatrix4fv(handle, 1, GL_FALSE, glm::value_ptr(mat));
 }
-
-void ShaderProgram::set_color(const glm::vec3& color) const
+void ShaderProgram::set_vec3(std::string_view u_name, const glm::vec3& vec) const
 {
-    glUniform3fv(u_color, 1, glm::value_ptr(color));
+    GLint handle = uniform_location(u_name);
+    glUniform3fv(handle, 1, glm::value_ptr(vec));
+}
+void ShaderProgram::set_bool(std::string_view u_name, const bool b) const
+{
+    GLint handle = uniform_location(u_name);
+    glUniform1i(handle, b);
 }
 
 

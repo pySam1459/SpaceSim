@@ -5,6 +5,7 @@
 
 struct Vertex {
     float x, y, z;
+    float nx, ny, nz;
 };
 
 struct Mesh {

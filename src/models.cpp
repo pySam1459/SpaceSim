@@ -8,7 +8,8 @@
 #include "mesh.hpp"
 #include "opengl_fwd.hpp"
 
-
+namespace
+{
 constexpr Vertex cube_vertices[8] = {
     { -1.0f,  1.0f,  1.0f },
     {  1.0f,  1.0f,  1.0f },
@@ -29,16 +30,17 @@ constexpr GLuint cube_indices[36] = {
     4, 3, 0,  4, 7, 3, // left
     1, 6, 5,  1, 2, 6  // right
 };
-
+}
 
 Cube::Cube(std::uint32_t idx) noexcept
         : Model(cube_vertices, std::size(cube_vertices),
                 cube_indices,  std::size(cube_indices),
-                idx) {}
+                idx, false) {}
 
 
 namespace
 {
+// little help from chatgpt
 void generate_uv_sphere(float radius,
                         std::uint32_t sector_count,
                         std::uint32_t stack_count,
@@ -75,10 +77,7 @@ void generate_uv_sphere(float radius,
             float nz = cos_phi;
 
             // Append 8 floats: position (3) + normal (3) + uv (2)
-            vertices.insert(vertices.end(), {x, y, z});
-                            // { x, y, z,
-                            //   nx, ny, nz,
-                            //   u, v });
+            vertices.insert(vertices.end(), { x, y, z, nx, ny, nz });
         }
     }
 
@@ -100,14 +99,15 @@ void generate_uv_sphere(float radius,
 }
 
 Sphere::Sphere(std::uint32_t idx,
+               bool is_light_source,
                std::vector<Vertex>& vertices,
                std::vector<GLuint>& indices) noexcept
             : Model(vertices.data(), vertices.size(),
                     indices.data(),  indices.size(),
-                    idx) {}
+                    idx, is_light_source) {}
 
 
-std::unique_ptr<Sphere> create_sphere(std::uint32_t idx)
+std::unique_ptr<Sphere> create_sphere(std::uint32_t idx, bool is_light_source)
 {
     std::vector<Vertex> vertices;
     std::vector<GLuint> indices;
@@ -115,5 +115,5 @@ std::unique_ptr<Sphere> create_sphere(std::uint32_t idx)
         1.0f, 36, 18,
         vertices, indices);
 
-    return std::make_unique<Sphere>(idx, vertices, indices);
+    return std::make_unique<Sphere>(idx, is_light_source, vertices, indices);
 }

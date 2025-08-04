@@ -56,10 +56,12 @@ void GLAPIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum sev
 
 
 namespace {
+const std::string shader_name = "sphere";
+
 ShaderProgram load_basic_shader()
 {
-    auto vertexShader   = read_file_to_string("shaders/basic/basic.vert");
-    auto fragmentShader = read_file_to_string("shaders/basic/basic.frag");
+    auto vertexShader   = read_file_to_string(std::format("shaders/{0}/{0}.vert", shader_name));
+    auto fragmentShader = read_file_to_string(std::format("shaders/{0}/{0}.frag", shader_name));
 
     return make_program(
         compile_shader(GL_VERTEX_SHADER,   vertexShader),
@@ -74,7 +76,7 @@ State create_state()
     state.transforms.push_back(Transform{{5, 0, -3.0f}, {1.0f, 0.5f, 0, 0}, 0.5f});
     
     for (std::uint32_t i=0; i<kNumObjects; ++i) {
-        state.models.push_back(create_sphere(i));
+        state.models.push_back(create_sphere(i, i==0));
     }
     return state;
 }
@@ -206,11 +208,7 @@ private:
         state.swap();
         // physics
 
-        glm::quat drot = glm::angleAxis(glm::radians(1.0f), glm::vec3(1.0f, 0.0f, 0.0f))
-                       * glm::angleAxis(glm::radians(1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        for (Transform& tf: state.transforms) {
-            tf.rot = glm::normalize(drot * tf.rot);
-        }
+        state.transforms[1].pos.x += 0.01;
     }
 
     void render(float alpha)
@@ -220,14 +218,24 @@ private:
 
         glUseProgram(shader_program.id);
 
-        glm::mat4 view = cam.getView();
-        glm::mat4 vp = proj_mat * view;
+        const glm::mat4 view = cam.getView();
+        const glm::mat4 vp = proj_mat * view;
+        shader_program.set_mat4("u_vp", vp);
+
+        shader_program.set_vec3("u_view_pos", cam.position);
+        for (const auto& model : state.models) {
+            if (model->is_light_source) {
+                glm::vec3 pos = glm::mix(state.prev_tfs[model->idx].pos, state.transforms[model->idx].pos, alpha);
+                shader_program.set_vec3("u_light_pos", pos);
+            }
+        }
 
         for (const auto& model : state.models) {
             const Transform tf = interpolate(state.prev_tfs[model->idx], state.transforms[model->idx], alpha);
-            const glm::mat4 mvp = vp * tf.to_model_mat4();
-            shader_program.set_mvp(mvp);
-            shader_program.set_color(colours[model->idx]);
+            shader_program.set_mat4("u_model", tf.to_model_mat4());
+            shader_program.set_vec3("u_albedo", colours[model->idx]);
+            shader_program.set_bool("u_enable_light", !model->is_light_source);
+
             model->draw();
         }
 
